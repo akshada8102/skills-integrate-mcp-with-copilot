@@ -5,10 +5,11 @@ A super simple FastAPI application that allows students to view and sign up
 for extracurricular activities at Mergington High School.
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 import os
+import json
 from pathlib import Path
 
 app = FastAPI(title="Mergington High School API",
@@ -18,6 +19,10 @@ app = FastAPI(title="Mergington High School API",
 current_dir = Path(__file__).parent
 app.mount("/static", StaticFiles(directory=os.path.join(Path(__file__).parent,
           "static")), name="static")
+
+# Load teachers credentials
+with open(os.path.join(current_dir, "teachers.json")) as f:
+    teachers = json.load(f)
 
 # In-memory activity database
 activities = {
@@ -80,7 +85,7 @@ activities = {
 
 @app.get("/")
 def root():
-    return RedirectResponse(url="/static/index.html")
+    return RedirectResponse(url="/static/login.html")
 
 
 @app.get("/activities")
@@ -130,3 +135,15 @@ def unregister_from_activity(activity_name: str, email: str):
     # Remove student
     activity["participants"].remove(email)
     return {"message": f"Unregistered {email} from {activity_name}"}
+
+
+@app.post("/login")
+def login(username: str = Form(...), password: str = Form(...), role: str = Form(...)):
+    if role == "admin":
+        if username not in teachers or teachers[username] != password:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        return {"redirect": "/static/admin.html"}
+    elif role == "user":
+        return {"redirect": "/static/index.html"}
+    else:
+        raise HTTPException(status_code=400, detail="Invalid role")
